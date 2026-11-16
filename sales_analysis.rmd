@@ -1,0 +1,86 @@
+---
+title: "Documentation: sales_analysis.R"
+author: "Shyam Mohan Jayamohan"
+date: "2026-11-16"
+output: html_document
+---
+
+> **AI Assistance Declaration:** I used Google Gemini for Markdown formatting suggestions and code block examples for this document. Prompts used: see `Appendix.md`. I verified outputs by knitting this file in Posit Cloud and checking that all headers, sections, and code chunks render correctly. All final calculations are done by myself. I am responsible for the accuracy and originality of this work.
+
+# Purpose
+
+`sales_analysis.R` is a single, self-contained analysis script. It generates a **synthetic** retail sales dataset (2,400 orders across 2025), cleans it, summarizes monthly revenue by product category, and saves a trend chart. It exists so the team can see a full, minimal example of a documented R workflow: data in, summary and chart out.
+
+## Inputs
+
+The script takes **no external input files**. All data is synthetic and generated inside the script:
+
+```{r inputs, eval=FALSE}
+set.seed(400)  # makes the synthetic data reproducible
+
+n_orders <- 2400
+sales <- tibble(
+  order_id   = sprintf("ORD-%05d", 1:n_orders),
+  order_date = as.Date("2025-01-01") + sample(0:364, n_orders, replace = TRUE),
+  category   = sample(c("Grocery", "Household", "Snacks", "Beverages"),
+                      n_orders, replace = TRUE,
+                      prob = c(0.40, 0.25, 0.20, 0.15)),
+  amount     = round(rlnorm(n_orders, meanlog = 3.9, sdlog = 0.45), 2)
+)
+```
+
+**Dependencies:** `dplyr`, `ggplot2`, `lubridate` (install once with `install.packages()`).
+
+## Processing Steps
+
+1. **Clean** — defensively drop rows with non-positive amounts or missing dates:
+
+```{r clean, eval=FALSE}
+sales_clean <- sales %>%
+  filter(amount > 0, !is.na(order_date))
+```
+
+2. **Summarize** — collapse orders to one row per month x category:
+
+```{r summarise, eval=FALSE}
+monthly_summary <- sales_clean %>%
+  mutate(month = floor_date(order_date, "month")) %>%
+  group_by(month, category) %>%
+  summarise(revenue = sum(amount),
+            orders  = n(),
+            .groups = "drop")
+```
+
+3. **Visualize** — one line per category across the twelve months:
+
+```{r plot, eval=FALSE}
+trend_plot <- ggplot(monthly_summary,
+                     aes(x = month, y = revenue, colour = category)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.6) +
+  labs(title = "Monthly Revenue by Category (Synthetic Data, 2025)",
+       x = "Month", y = "Revenue ($)", colour = "Category") +
+  theme_minimal()
+```
+
+## Outputs
+
+| Output              | Type                  | Description                                        |
+|---------------------|-----------------------|----------------------------------------------------|
+| `monthly_summary`   | data frame (48 rows)  | Revenue and order count per month per category     |
+| `monthly_trend.png` | PNG image (9 x 5 in)  | Line chart of monthly revenue, one line per category |
+| Console output      | text                  | First 8 rows of the summary, plus a completion message |
+
+## How to Run
+
+```{r run, eval=FALSE}
+source("sales_analysis.R")
+head(monthly_summary)
+```
+
+Because the data is seeded (`set.seed(400)`), every run reproduces identical numbers — a teammate can verify any figure by re-running the script.
+
+## Notes and Conventions
+
+- Chunks in this document use `eval=FALSE`: they mirror the script for reading, while the script itself remains the single source of truth that actually runs.
+- Section layout (`# Purpose`, `## Inputs`, `## Outputs`) follows the structure suggested during the AI-assisted formatting review; see the AI Assistance Disclosure in `README.md` and the full log in `Appendix.md`.
